@@ -2,116 +2,146 @@
 <html>
 
 <head>
-    <meta charset="utf-8">
-    <title>时间统计</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-image: url('background.jpg'); 
-            background-size: cover; 
-            background-position: center;
-            background-repeat: no-repeat;
-            height: 100vh; 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+  <meta charset="utf-8">
+  <title>时间统计</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-image: url('background.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
 
-        #wrapper {
-            width: 90vw; 
-            height: 90vh; 
-            background: rgba(0, 5, 36, 0.8); 
-            border: 1px solid #000;
-            box-shadow: 0 22px 35px -16px rgba(0, 0, 0, 0.71);
-            display: flex;
-            flex-direction: column; 
-            justify-content: flex-start; 
-            align-items: center; 
-            padding: 20px; 
-            box-sizing: border-box;
-        }
-        
-        #chart-area {
-            width: 100%;
-            height: auto; 
-            position: relative;
-            margin-top: 20%;
-        }
-        
-        #chart-bar {
-            width: 100%;
-            height: auto;
-            position: relative;
-        }
-    </style>
+    #wrapper {
+      width: 90vw;
+      height: 90vh;
+      background: rgba(0, 5, 36, 0.8);
+      border: 1px solid #000;
+      box-shadow: 0 22px 35px -16px rgba(0, 0, 0, 0.71);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      padding: 2%;
+      box-sizing: border-box;
+    }
+
+    #chart-title {
+      color: #fff;
+      font-size: 20px;
+      margin-bottom: 10px;
+      text-align: center;
+      width: 100%;
+    }
+
+    #chart-area {
+      width: 100%;
+      height: auto;
+      position: relative;
+      margin-top: 0;
+      /* 调整为 0 或者更小的值，比如 1% */
+    }
+
+    #chart-bar {
+      width: 100%;
+      height: auto;
+      position: relative;
+    }
+  </style>
 </head>
 
 <body>
-    <script src="js/apexcharts.js"></script>
-    <div id="wrapper">
-        <div id="chart-area"></div>
-        <div id="chart-bar"></div>
-    </div>
-    <script>
-  //--------------------------------------------------------------------------- 我的数据
-  var myData = [
-    [new Date("2023-10-01").getTime(), 50],
-    [new Date("2023-10-02").getTime(), 60],
-    [new Date("2023-10-03").getTime(), 70],
-  ];
-  //--------------------------------------------------------------------------- 我的数据
-  var data = myData; 
-  var options1 = {
-    chart: {
-      id: "chart2",
-      type: "area",
-      height: 230,
-      foreColor: "#ccc",
-      toolbar: { autoSelected: "pan", show: false }
-    },
-    colors: ["#00BAEC"],
-    stroke: { width: 3 },
-    grid: { borderColor: "#555", yaxis: { lines: { show: false } } },
-    dataLabels: { enabled: false },
-    fill: { gradient: { enabled: true, opacityFrom: 0.55, opacityTo: 0 } },
-    markers: { size: 5, colors: ["#000524"], strokeColor: "#00BAEC", strokeWidth: 3 },
-    series: [{ data: data }], 
-    tooltip: { theme: "dark" },
-    xaxis: { type: "datetime" },
-    yaxis: { min: 0, tickAmount: 4 }
-  };
+  <script src="js/apexcharts.js"></script>
+  <div id="wrapper">
+    <div id="chart-area"></div>
+    <div id="chart-bar"></div>
+  </div>
+  <script>
+    // 读取 data.txt 文件并解析数据
+    fetch('data.txt')
+      .then(response => response.text())
+      .then(text => {
+        const lines = text.split('\n');
+        let totalHours = 0;
+        const data = lines.map(line => {
+          const [dateStr, value] = line.split(' ');
+          const [month, day] = dateStr.split('/');
+          const date = new Date(`2025-${month}-${day}`).getTime();
+          const floatValue = parseFloat(value);
+          totalHours += floatValue;
+          return [date, floatValue];
+        });
 
-  var chart1 = new ApexCharts(document.querySelector("#chart-area"), options1);
-  chart1.render();
+        // 添加标题
+        const title = document.createElement('div');
+        const today = new Date();
+        const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        title.id = 'chart-title';
+        title.textContent = `截止${formattedDate}已记录${totalHours.toFixed(2)}小时`;
+        document.querySelector('#wrapper').prepend(title);
 
-  var options2 = {
-    chart: {
-      id: "chart1",
-      height: 130,
-      type: "bar",
-      foreColor: "#ccc",
-      brush: { target: "chart2", enabled: true },
-      selection: {
-        fill: { color: "#fff", opacity: 0.4 },
-        xaxis: {
-          min: new Date("2023-10-01").getTime(), 
-          max: new Date("2023-10-03").getTime() 
-        }
-      }
-    },
-    colors: ["#FF0080"],
-    series: [{ data: data }], 
-    stroke: { width: 2 },
-    grid: { borderColor: "#444" },
-    markers: { size: 0 },
-    xaxis: { type: "datetime", tooltip: { enabled: false } },
-    yaxis: { tickAmount: 2 }
-  };
+        // 渲染图表
+        renderCharts(data);
+      })
+      .catch(error => console.error('Error reading data.txt:', error));
 
-  var chart2 = new ApexCharts(document.querySelector("#chart-bar"), options2);
-  chart2.render();
-</script>
+    function renderCharts(data) {
+      var options1 = {
+        chart: {
+          id: "chart-area",
+          type: "area",
+          height: 250,
+          foreColor: "#ccc",
+          toolbar: { autoSelected: "pan", show: false }
+        },
+        colors: ["#00BAEC"],
+        stroke: { width: 3 },
+        grid: { borderColor: "#555", yaxis: { lines: { show: false } } },
+        dataLabels: { enabled: false },
+        fill: { gradient: { enabled: true, opacityFrom: 0.55, opacityTo: 0 } },
+        markers: { size: 5, colors: ["#000524"], strokeColor: "#00BAEC", strokeWidth: 3 },
+        series: [{ name: "学习时间", data: data }],
+        tooltip: { theme: "dark" },
+        xaxis: { type: "datetime" },
+        yaxis: { min: 0, tickAmount: 4 }
+      };
+
+      var options2 = {
+        chart: {
+          id: "chart-bar",
+          height: 130,
+          type: "bar",
+          foreColor: "#ccc",
+          brush: { target: "chart-area", enabled: true },
+          selection: {
+            fill: { color: "#fff", opacity: 0.4 },
+            xaxis: {
+              min: new Date("2025-2-17").getTime(), // 时间范围
+              max: new Date("2025-4-27").getTime()
+            }
+          }
+        },
+        colors: ["#FF0080"],
+        series: [{ data: data }],
+        stroke: { width: 2 },
+        grid: { borderColor: "#444" },
+        markers: { size: 0 },
+        xaxis: { type: "datetime", tooltip: { enabled: false } },
+        yaxis: { tickAmount: 1 }
+      };
+
+      var chart1 = new ApexCharts(document.querySelector("#chart-area"), options1);
+      chart1.render();
+      var chart2 = new ApexCharts(document.querySelector("#chart-bar"), options2);
+      chart2.render();
+    }
+  </script>
 </body>
 
 </html>
