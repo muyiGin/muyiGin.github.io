@@ -3,7 +3,13 @@
 
 <head>
   <meta charset="utf-8">
-  <title>大二春季学期</title>
+  <title>学习进度可视化</title>
+
+  <script>
+    const DATA_PATH = "sophomore_spring.txt"; // 🌟数据文件名
+    const START_DATE = "2025-02-17"; // 🌟学期开始日期
+    const END_DATE = "2025-04-18"; // 🌟学期结束日期
+  </script>
   <style>
     body {
       margin: 0;
@@ -16,6 +22,7 @@
       display: flex;
       justify-content: center;
       align-items: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
 
     #wrapper {
@@ -40,14 +47,7 @@
       width: 100%;
     }
 
-    #chart-area {
-      width: 100%;
-      height: auto;
-      position: relative;
-      margin-top: 0;
-      /* 调整为 0 或者更小的值，比如 1% */
-    }
-
+    #chart-area,
     #chart-bar {
       width: 100%;
       height: auto;
@@ -63,76 +63,98 @@
     <div id="chart-bar"></div>
   </div>
   <script>
-    // 读取 data.txt 文件并解析数据
-    fetch('sophomore_spring.txt')
-      .then(response => response.text())
+    // 使用在 head 中定义的配置变量
+    const dataPath = DATA_PATH;
+    const startDate = new Date(START_DATE);
+    const endDate = new Date(END_DATE);
+
+    // 读取数据文件并解析
+    fetch(dataPath)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}, failed to load ${dataPath}`);
+        }
+        return response.text();
+      })
       .then(text => {
-        const lines = text.split('\n');
+        const lines = text.trim().split('\n');
         let totalHours = 0;
         const data = lines.map(line => {
+          if (line.trim() === '') return null;
           const [dateStr, value] = line.split(' ');
           const [month, day] = dateStr.split('/');
           const date = new Date(`2025-${month}-${day}`).getTime();
           const floatValue = parseFloat(value);
+          if (isNaN(floatValue)) return null;
           totalHours += floatValue;
           return [date, floatValue];
-        });
+        }).filter(item => item !== null);
 
-        // 添加标题
-        const title = document.createElement('div');
+        // --- 核心逻辑修改 ---
         const today = new Date();
-        const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const oneDay = 1000 * 60 * 60 * 24;
+
+        // 计算学期总天数，至少为1天
+        const totalTermDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / oneDay));
+
+        // 计算从开始日期到今天的天数（如果还没到开始日期，则为负数）
+        const elapsedDaysRaw = Math.ceil((today.getTime() - startDate.getTime()) / oneDay);
+
+        // 修正“已过天数”：下限为0，上限为学期总天数
+        const displayElapsedDays = Math.max(0, Math.min(elapsedDaysRaw, totalTermDays));
+
+        // 用于计算平均值的分母：至少为1，以避免除以0的错误
+        const effectiveElapsedDays = Math.max(1, displayElapsedDays);
+        const averageHoursPerDay = totalHours / effectiveElapsedDays;
+        // --- 修改结束 ---
+
+        // 动态生成并添加标题
+        const title = document.createElement('div');
+        const formattedStartDate = START_DATE.replace(/-/g, '/');
+        const formattedEndDate = END_DATE.replace(/-/g, '/');
         title.id = 'chart-title';
-        title.textContent = `该春季学期（2025/2/17-2025/4/18）已记录学习时间${totalHours.toFixed(2)}小时`;
+        title.innerHTML = `该学期（${formattedStartDate} - ${formattedEndDate}）共${totalTermDays}天，已记录学习时间${totalHours.toFixed(2)}小时<br>
+                           目前已过${displayElapsedDays}天，平均每天${averageHoursPerDay.toFixed(2)}小时`;
         document.querySelector('#wrapper').prepend(title);
 
         // 渲染图表
         renderCharts(data);
       })
-      .catch(error => console.error('Error reading data.txt:', error));
+      .catch(error => {
+        console.error('Error processing data:', error);
+        const wrapper = document.querySelector('#wrapper');
+        wrapper.innerHTML = `<div id="chart-title" style="color:red;">加载数据失败，请检查文件路径<br>(${DATA_PATH})<br>或数据格式是否正确。<br><br>错误信息: ${error.message}</div>`;
+      });
 
     function renderCharts(data) {
+      const brushMinDate = new Date(START_DATE);
+      brushMinDate.setDate(brushMinDate.getDate() - 1);
+
       var options1 = {
-        chart: {
-          id: "chart-area",
-          type: "area",
-          height: 250,
-          foreColor: "#ccc",
-          toolbar: { autoSelected: "pan", show: false }
-        },
+        chart: { id: "chart-area", type: "area", height: 250, foreColor: "#ccc", toolbar: { autoSelected: "pan", show: false } },
         colors: ["#00BAEC"],
-        stroke: { width: 3 },
+        stroke: { width: 3, curve: 'smooth' },
         grid: { borderColor: "#555", yaxis: { lines: { show: false } } },
         dataLabels: { enabled: false },
         fill: { gradient: { enabled: true, opacityFrom: 0.55, opacityTo: 0 } },
         markers: { size: 5, colors: ["#000524"], strokeColor: "#00BAEC", strokeWidth: 3 },
         series: [{ name: "学习时间", data: data }],
-        tooltip: { theme: "dark" },
+        tooltip: { theme: "dark", x: { format: 'yyyy/MM/dd' } },
         xaxis: { type: "datetime" },
-        yaxis: { min: 0, tickAmount: 4 }
+        yaxis: { min: 0, tickAmount: 4, labels: { formatter: (val) => val.toFixed(1) } }
       };
 
       var options2 = {
         chart: {
-          id: "chart-bar",
-          height: 130,
-          type: "bar",
-          foreColor: "#ccc",
-          brush: { target: "chart-area", enabled: true },
-          selection: {
-            fill: { color: "#fff", opacity: 0.4 },
-            xaxis: {
-              min: new Date("2025-2-17").getTime(), // 时间范围
-              max: new Date("2025-4-18").getTime()
-            }
-          }
+          id: "chart-bar", height: 130, type: "bar", foreColor: "#ccc", brush: { target: "chart-area", enabled: true },
+          selection: { enabled: true, fill: { color: "#fff", opacity: 0.4 }, xaxis: { min: new Date(START_DATE).getTime(), max: new Date(END_DATE).getTime() } }
         },
         colors: ["#FF0080"],
         series: [{ data: data }],
         stroke: { width: 2 },
         grid: { borderColor: "#444" },
         markers: { size: 0 },
-        xaxis: { type: "datetime", tooltip: { enabled: false } },
+        xaxis: { type: "datetime", tooltip: { enabled: false }, min: brushMinDate.getTime(), max: new Date(END_DATE).getTime() },
         yaxis: { tickAmount: 1 }
       };
 
