@@ -63,26 +63,26 @@
   </div>
   <script>
     // 读取 data.txt 文件并解析数据
-    fetch('sophomore_summer.txt')
+    fetch('sophomore_summer.txt') // 确保这里是读取夏季学期的数据文件
       .then(response => response.text())
       .then(text => {
         const lines = text.split('\n');
-        let totalHours = 0;
+        let totalHours = 0; // 初始化 totalHours
+
         const data = lines.map(line => {
           const [dateStr, value] = line.split(' ');
           const [month, day] = dateStr.split('/');
-          const date = new Date(`2025-${month}-${day}`).getTime();
+          const date = new Date(`2025-${month}-${day}`);
           const floatValue = parseFloat(value);
-          totalHours += floatValue;
-          return [date, floatValue];
+          totalHours += floatValue; // 累加学习时间
+          return [date.getTime(), floatValue]; // 存入数据时仍然是时间戳
         });
 
-        // 添加标题
+        // 添加标题，并显示总学习时间
         const title = document.createElement('div');
-        const today = new Date();
-        const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         title.id = 'chart-title';
-        title.textContent = `大二夏季学期（2025/5/12-2025/8/10）`;
+        // 修改标题文本，显示夏季学期的时间范围和总学习时间
+        title.textContent = `大二夏季学期（2025/5/12-2025/8/10）已记录学习时间${totalHours.toFixed(2)}小时`;
         document.querySelector('#wrapper').prepend(title);
 
         // 渲染图表
@@ -107,8 +107,41 @@
         markers: { size: 5, colors: ["#000524"], strokeColor: "#00BAEC", strokeWidth: 3 },
         series: [{ name: "学习时间", data: data }],
         tooltip: { theme: "dark" },
-        xaxis: { type: "datetime" },
-        yaxis: { min: 0, tickAmount: 4 }
+        xaxis: {
+          type: "datetime",
+          // 设置 X 轴的起始和结束日期
+          min: new Date("2025-05-12").getTime(),
+          max: new Date("2025-08-10").getTime(),
+          labels: {
+            formatter: function (value, timestamp, opts) {
+              const date = new Date(timestamp);
+              const dayOfWeek = date.getDay(); // 获取星期几 (0:周日, 1:周一, ..., 6:周六)
+
+              // 2025/5/12 是星期一 (dayOfWeek === 1)。
+              // 我们只显示每个周一的日期，并且确保起始日期 5/12 也显示。
+              if (dayOfWeek === 1 || timestamp === new Date("2025-05-12").getTime()) {
+                return `${date.getMonth() + 1}/${date.getDate()}`; // 格式化为 MM/dd
+              }
+              return ''; // 其他日期不显示刻度
+            }
+          },
+          tickAmount: 12, // 配合 formatter，帮助 ApexCharts 均匀分布刻度
+          tickPlacement: 'on',
+          tooltip: { enabled: false }
+        },
+        yaxis: {
+          min: 0,
+          max: 12,
+          tickAmount: 4,
+          labels: {
+            formatter: function (val) {
+              if (val % 3 === 0 && val >= 0 && val <= 12) {
+                return val.toFixed(0);
+              }
+              return '';
+            }
+          }
+        }
       };
 
       var options2 = {
@@ -121,8 +154,8 @@
           selection: {
             fill: { color: "#fff", opacity: 0.4 },
             xaxis: {
-              min: new Date("2025-5-11").getTime(), // 时间范围
-              max: new Date("2025-8-10").getTime()
+              min: new Date("2025-05-11").getTime(), // 注意这里使用5-11，稍微早一点以确保覆盖5-12
+              max: new Date("2025-08-10").getTime()
             }
           }
         },
@@ -131,7 +164,21 @@
         stroke: { width: 2 },
         grid: { borderColor: "#444" },
         markers: { size: 0 },
-        xaxis: { type: "datetime", tooltip: { enabled: false } },
+        xaxis: {
+          type: "datetime",
+          tooltip: { enabled: false },
+          labels: {
+            formatter: function (value, timestamp, opts) {
+              const date = new Date(timestamp);
+              const dayOfWeek = date.getDay();
+              if (dayOfWeek === 1 || timestamp === new Date("2025-05-12").getTime()) {
+                return `${date.getMonth() + 1}/${date.getDate()}`;
+              }
+              return '';
+            }
+          },
+          tickAmount: 4, // 缩略图的刻度可以更少
+        },
         yaxis: { tickAmount: 1 }
       };
 
@@ -143,4 +190,4 @@
   </script>
 </body>
 
-</html>
+</html>/html>
