@@ -179,7 +179,20 @@
           },
           tickAmount: 4, // 缩略图的刻度可以更少
         },
-        yaxis: { tickAmount: 1 }
+        yaxis: {
+          min: 0, // 最小值设置为 0
+          max: 12, // 最大值设置为 12
+          tickAmount: 2, // 从 0 到 12，如果你想要 0, 6, 12 这 3 个刻度，那么就有 2 个间隔 (0-6, 6-12)。
+          labels: {
+            formatter: function (val) {
+              // 确保只显示 0, 6, 12
+              if (val === 0 || val === 6 || val === 12) {
+                return val.toFixed(0); // 返回整数形式的标签
+              }
+              return ''; // 其他值不显示
+            }
+          }
+        }
       };
 
       var chart1 = new ApexCharts(document.querySelector("#chart-area"), options1);
@@ -190,4 +203,4 @@
   </script>
 </body>
 
-</html>/html>
+</html>
