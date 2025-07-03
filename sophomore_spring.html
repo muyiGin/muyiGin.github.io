@@ -141,7 +141,14 @@
         series: [{ name: "学习时间", data: data }],
         tooltip: { theme: "dark", x: { format: 'yyyy/MM/dd' } },
         xaxis: { type: "datetime" },
-        yaxis: { min: 0, tickAmount: 4, labels: { formatter: (val) => val.toFixed(1) } }
+        yaxis: {
+          min: 0,
+          max: 12,
+          tickAmount: 4, // 4个区间会产生 0, 3, 6, 9, 12 共5个刻度
+          labels: {
+            formatter: (val) => val.toFixed(0) // 显示为整数
+          }
+        }
       };
 
       var options2 = {
@@ -155,7 +162,14 @@
         grid: { borderColor: "#444" },
         markers: { size: 0 },
         xaxis: { type: "datetime", tooltip: { enabled: false }, min: brushMinDate.getTime(), max: new Date(END_DATE).getTime() },
-        yaxis: { tickAmount: 1 }
+        yaxis: {
+          min: 0,
+          max: 12,
+          tickAmount: 2, // 2个区间会产生 0, 6, 12 共3个刻度
+          labels: {
+            formatter: (val) => val.toFixed(0) // 显示为整数
+          }
+        }
       };
 
       var chart1 = new ApexCharts(document.querySelector("#chart-area"), options1);
