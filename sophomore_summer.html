@@ -146,7 +146,7 @@
           max: 12,
           tickAmount: 4, // 4个区间会产生 0, 3, 6, 9, 12 共5个刻度
           labels: {
-            formatter: (val) => val.toFixed(0) // 显示为整数
+            formatter: (val) => val.toFixed(1) // 显示为整数
           }
         }
       };
@@ -167,7 +167,7 @@
           max: 12,
           tickAmount: 2, // 2个区间会产生 0, 6, 12 共3个刻度
           labels: {
-            formatter: (val) => val.toFixed(0) // 显示为整数
+            formatter: (val) => val.toFixed(0)
           }
         }
       };
