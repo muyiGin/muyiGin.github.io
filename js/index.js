@@ -21,31 +21,14 @@ async function init() {
     document.addEventListener('mouseover', function (e) {
         const target = e.target.closest('.apexcharts-xaxis-label');
         if (target) {
-            const allLabels = document.querySelectorAll('.apexcharts-xaxis-label');
-            const index = Array.from(allLabels).indexOf(target);
-            const absWeekNum = index + 1;
-            const termInfo = weekToTermMap[absWeekNum];
-
-            if (termInfo) {
-                allLabels.forEach((label, idx) => {
-                    const w = idx + 1;
-                    if (weekToTermMap[w] && weekToTermMap[w].termId === termInfo.termId) {
-                        label.classList.add('active-term-label');
-                    } else {
-                        label.style.opacity = '0.3';
-                    }
-                });
-            }
+            target.classList.add('active-term-label');
         }
     });
 
     document.addEventListener('mouseout', function (e) {
-        if (e.target.closest('.apexcharts-xaxis-label')) {
-            const allLabels = document.querySelectorAll('.apexcharts-xaxis-label');
-            allLabels.forEach(label => {
-                label.classList.remove('active-term-label');
-                label.style.opacity = '1';
-            });
+        const target = e.target.closest('.apexcharts-xaxis-label');
+        if (target) {
+            target.classList.remove('active-term-label');
         }
     });
 
@@ -62,6 +45,9 @@ async function init() {
 async function loadYearData(year) {
     const periods = globalConfig[year];
     if (!periods) return;
+
+    // 清空全局缓存
+    globalFunMap = {};
 
     buildWeekToTermMap(periods, year);
     await loadGlobalFunData(year);
@@ -105,43 +91,66 @@ async function loadYearData(year) {
 
     // 准备图表数据
     const maxWeek = 52;
-    const categories = [];
     const labelColors = [];
     const seriesStudy = [], seriesWaste = [], seriesFun = [];
 
-    // 寻找数据的最小值（用于确定 Y 轴下限）
+    // 平均值计算变量
+    let currentTermId = null;
+    let termAccumulatedStudy = 0;
+    let termWeeksCount = 0;
     let minDataValue = 0;
 
     for (let i = 1; i <= maxWeek; i++) {
         const termInfo = weekToTermMap[i];
 
-        if (termInfo) {
-            categories.push(`${termInfo.relativeWeek}`);
-            labelColors.push(termInfo.color);
-        } else {
-            categories.push(`${i}`);
-            labelColors.push('#ccc');
+        // 检测学期切换
+        let thisWeekTermId = termInfo ? termInfo.termId : 'unknown_term';
+        if (thisWeekTermId !== currentTermId) {
+            currentTermId = thisWeekTermId;
+            termAccumulatedStudy = 0;
+            termWeeksCount = 0;
         }
 
-        const d = weeklyData[i] || { study: 0, waste: 0, fun: 0 };
+        if (termInfo) {
+            labelColors.push(termInfo.color);
+        } else {
+            labelColors.push('#ccc');
+            // 如果该周不属于任何配置的学期，也视为新阶段重置
+            if (currentTermId !== 'unknown') {
+                currentTermId = 'unknown';
+                termAccumulatedStudy = 0;
+                termWeeksCount = 0;
+            }
+        }
 
-        seriesStudy.push(d.study);
-        seriesWaste.push(d.waste);
-        seriesFun.push(-Math.abs(d.fun)); // 负数
+        if (!weeklyData[i]) {
+            weeklyData[i] = { study: 0, waste: 0, fun: 0 };
+        }
+        const d = weeklyData[i];
+
+        // 计算本阶段平均值
+        if (d.study > 0 || d.waste > 0 || d.fun > 0) {
+            termAccumulatedStudy += d.study;
+            termWeeksCount++;
+            d.termAverage = (termAccumulatedStudy / termWeeksCount).toFixed(1);
+        }
+
+        seriesStudy.push({ x: i, y: d.study });
+        seriesWaste.push({ x: i, y: d.waste });
+        seriesFun.push({ x: i, y: -Math.abs(d.fun) });
 
         if (-Math.abs(d.fun) < minDataValue) minDataValue = -Math.abs(d.fun);
     }
 
-    // Y 轴刻度计算
     const yMax = 80;
     const yMin = Math.floor(minDataValue / 20) * 20;
     const tickAmount = (yMax - yMin) / 20;
 
     updateSummary(totalStudy, totalWaste, totalFun);
-    renderChart(categories, labelColors, seriesStudy, seriesWaste, seriesFun, periods, year, yMin, yMax, tickAmount);
+    renderChart(labelColors, seriesStudy, seriesWaste, seriesFun, periods, year, yMin, yMax, tickAmount);
 }
 
-function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, currentYear, yMin, yMax, tickAmount) {
+function renderChart(labelColors, sStudy, sWaste, sFun, periods, currentYear, yMin, yMax, tickAmount) {
     const options = {
         series: [
             { name: '学习', data: sStudy },
@@ -149,17 +158,18 @@ function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, cur
             { name: '娱乐', data: sFun }
         ],
         chart: {
-            type: 'bar', // 🌟 回归 bar 类型，这是最稳健的堆叠图表
+            type: 'bar',
             height: '100%',
-            stacked: true, // 开启堆叠
-            toolbar: {
-                show: true,
-                tools: { download: true, selection: true, zoom: true, zoomin: true, zoomout: true, pan: true, reset: true }
-            },
+            stacked: true,
+            toolbar: { show: false },
+            zoom: { enabled: false },
+            selection: { enabled: false },
             events: {
                 dataPointSelection: function (event, chartContext, config) {
-                    const weekIndex = config.dataPointIndex + 1;
-                    openModal(weekIndex, currentYear);
+                    const dataPoint = config.w.config.series[0].data[config.dataPointIndex];
+                    if (dataPoint) {
+                        openModal(dataPoint.x, currentYear);
+                    }
                 }
             }
         },
@@ -171,8 +181,15 @@ function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, cur
             },
         },
         dataLabels: { enabled: false },
-        fill: {
-            opacity: 1 // 确保颜色实心
+        fill: { opacity: 1 },
+        // 🌟 修复图例重叠问题
+        legend: {
+            position: 'bottom',
+            offsetY: 10,      // 往下推 10px
+            itemMargin: {
+                horizontal: 10,
+                vertical: 20  // 增加垂直间距
+            }
         },
         yaxis: {
             min: yMin,
@@ -183,7 +200,10 @@ function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, cur
             labels: { formatter: (val) => Math.abs(val).toFixed(0) }
         },
         xaxis: {
-            categories: categories,
+            type: 'numeric',
+            min: 0.5,
+            max: 52.5,
+            tickAmount: 52,
             axisBorder: { show: true, color: '#333' },
             axisTicks: { show: true, height: 6, color: '#333' },
             labels: {
@@ -193,7 +213,12 @@ function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, cur
                     fontWeight: 700,
                     fontFamily: 'Segoe UI, sans-serif'
                 },
-                offsetY: 0
+                offsetY: 0,
+                formatter: function (val) {
+                    const absWeek = Math.round(val);
+                    const termInfo = weekToTermMap[absWeek];
+                    return termInfo ? termInfo.relativeWeek : '';
+                }
             },
             tooltip: { enabled: false }
         },
@@ -201,7 +226,10 @@ function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, cur
             shared: true,
             intersect: false,
             custom: function ({ series, seriesIndex, dataPointIndex, w }) {
-                const absWeek = dataPointIndex + 1;
+                const dataPoint = w.config.series[0].data[dataPointIndex];
+                if (!dataPoint) return '';
+
+                const absWeek = dataPoint.x;
                 const termInfo = weekToTermMap[absWeek];
                 const d = globalWeeklyData[absWeek] || { study: 0, waste: 0, fun: 0 };
                 const achvs = globalAchvMap[absWeek] || [];
@@ -233,6 +261,12 @@ function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, cur
                         </div>
                 `;
 
+                if (d.termAverage) {
+                    html += `<div style="padding:0 5px 8px; font-size:0.85rem; color:#555; font-weight:bold; border-bottom: 1px solid #eee; margin-bottom:5px;">
+                        📈 本阶段周均学习: <span style="color:#FEB019">${d.termAverage}h</span>
+                    </div>`;
+                }
+
                 if (achvs.length > 0) {
                     html += `
                         <div class="tooltip-section">
@@ -259,9 +293,13 @@ function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, cur
                 return html;
             }
         },
+        // 🌟 修复图例重叠：增加底部 Padding
         grid: {
             borderColor: '#f1f1f1',
-            xaxis: { lines: { show: false } }
+            xaxis: { lines: { show: false } },
+            padding: {
+                bottom: 40 // 留出 40px 给图例
+            }
         }
     };
 
@@ -270,7 +308,7 @@ function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, cur
     chart.render();
 }
 
-// ... (以下辅助函数保持不变：buildWeekToTermMap, parseDate, getWeekNumber, loadGlobalFunData, loadAchvData, updateSummary, openModal, closeModal) ...
+// 辅助函数
 function buildWeekToTermMap(periods, year) {
     weekToTermMap = {};
     const firstPeriodStart = parseDate(periods[0].start);
@@ -316,7 +354,7 @@ function getWeekNumber(d) {
 
 async function loadGlobalFunData(year) {
     try {
-        const res = await fetch(`data/${year}/fun.txt`);
+        const res = await fetch(`data/fun.txt`);
         if (res.ok) {
             const text = await res.text();
             text.trim().split('\n').forEach(line => {
@@ -326,6 +364,7 @@ async function loadGlobalFunData(year) {
                 if (match) {
                     const [_, dateStr, type, name, score] = match;
                     const date = parseDate(dateStr);
+                    if (date.getFullYear() !== year) return;
                     const weekNum = getWeekNumber(date);
                     if (!globalFunMap[weekNum]) globalFunMap[weekNum] = [];
                     const html = `<li>
