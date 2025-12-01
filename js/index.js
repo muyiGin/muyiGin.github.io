@@ -46,9 +46,7 @@ async function loadYearData(year) {
     const periods = globalConfig[year];
     if (!periods) return;
 
-    // 清空全局缓存
     globalFunMap = {};
-
     buildWeekToTermMap(periods, year);
     await loadGlobalFunData(year);
 
@@ -91,6 +89,7 @@ async function loadYearData(year) {
 
     // 准备图表数据
     const maxWeek = 52;
+    const categories = [];
     const labelColors = [];
     const seriesStudy = [], seriesWaste = [], seriesFun = [];
 
@@ -103,7 +102,7 @@ async function loadYearData(year) {
     for (let i = 1; i <= maxWeek; i++) {
         const termInfo = weekToTermMap[i];
 
-        // 检测学期切换
+        // 检测学期切换，重置平均值
         let thisWeekTermId = termInfo ? termInfo.termId : 'unknown_term';
         if (thisWeekTermId !== currentTermId) {
             currentTermId = thisWeekTermId;
@@ -112,10 +111,12 @@ async function loadYearData(year) {
         }
 
         if (termInfo) {
+            categories.push(`${termInfo.relativeWeek}`);
             labelColors.push(termInfo.color);
         } else {
+            categories.push(`${i}`);
             labelColors.push('#ccc');
-            // 如果该周不属于任何配置的学期，也视为新阶段重置
+
             if (currentTermId !== 'unknown') {
                 currentTermId = 'unknown';
                 termAccumulatedStudy = 0;
@@ -135,9 +136,9 @@ async function loadYearData(year) {
             d.termAverage = (termAccumulatedStudy / termWeeksCount).toFixed(1);
         }
 
-        seriesStudy.push({ x: i, y: d.study });
-        seriesWaste.push({ x: i, y: d.waste });
-        seriesFun.push({ x: i, y: -Math.abs(d.fun) });
+        seriesStudy.push(d.study);
+        seriesWaste.push(d.waste);
+        seriesFun.push(-Math.abs(d.fun));
 
         if (-Math.abs(d.fun) < minDataValue) minDataValue = -Math.abs(d.fun);
     }
@@ -147,10 +148,10 @@ async function loadYearData(year) {
     const tickAmount = (yMax - yMin) / 20;
 
     updateSummary(totalStudy, totalWaste, totalFun);
-    renderChart(labelColors, seriesStudy, seriesWaste, seriesFun, periods, year, yMin, yMax, tickAmount);
+    renderChart(categories, labelColors, seriesStudy, seriesWaste, seriesFun, periods, year, yMin, yMax, tickAmount);
 }
 
-function renderChart(labelColors, sStudy, sWaste, sFun, periods, currentYear, yMin, yMax, tickAmount) {
+function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, currentYear, yMin, yMax, tickAmount) {
     const options = {
         series: [
             { name: '学习', data: sStudy },
@@ -161,15 +162,14 @@ function renderChart(labelColors, sStudy, sWaste, sFun, periods, currentYear, yM
             type: 'bar',
             height: '100%',
             stacked: true,
+            // 🌟 关键修复：彻底禁用工具栏和缩放，恢复点击事件
             toolbar: { show: false },
             zoom: { enabled: false },
             selection: { enabled: false },
             events: {
                 dataPointSelection: function (event, chartContext, config) {
-                    const dataPoint = config.w.config.series[0].data[config.dataPointIndex];
-                    if (dataPoint) {
-                        openModal(dataPoint.x, currentYear);
-                    }
+                    const weekIndex = config.dataPointIndex + 1;
+                    openModal(weekIndex, currentYear);
                 }
             }
         },
@@ -182,14 +182,10 @@ function renderChart(labelColors, sStudy, sWaste, sFun, periods, currentYear, yM
         },
         dataLabels: { enabled: false },
         fill: { opacity: 1 },
-        // 🌟 修复图例重叠问题
         legend: {
             position: 'bottom',
-            offsetY: 10,      // 往下推 10px
-            itemMargin: {
-                horizontal: 10,
-                vertical: 20  // 增加垂直间距
-            }
+            offsetY: 10,
+            itemMargin: { horizontal: 10, vertical: 20 }
         },
         yaxis: {
             min: yMin,
@@ -200,10 +196,7 @@ function renderChart(labelColors, sStudy, sWaste, sFun, periods, currentYear, yM
             labels: { formatter: (val) => Math.abs(val).toFixed(0) }
         },
         xaxis: {
-            type: 'numeric',
-            min: 0.5,
-            max: 52.5,
-            tickAmount: 52,
+            categories: categories,
             axisBorder: { show: true, color: '#333' },
             axisTicks: { show: true, height: 6, color: '#333' },
             labels: {
@@ -213,12 +206,7 @@ function renderChart(labelColors, sStudy, sWaste, sFun, periods, currentYear, yM
                     fontWeight: 700,
                     fontFamily: 'Segoe UI, sans-serif'
                 },
-                offsetY: 0,
-                formatter: function (val) {
-                    const absWeek = Math.round(val);
-                    const termInfo = weekToTermMap[absWeek];
-                    return termInfo ? termInfo.relativeWeek : '';
-                }
+                offsetY: 0
             },
             tooltip: { enabled: false }
         },
@@ -226,10 +214,7 @@ function renderChart(labelColors, sStudy, sWaste, sFun, periods, currentYear, yM
             shared: true,
             intersect: false,
             custom: function ({ series, seriesIndex, dataPointIndex, w }) {
-                const dataPoint = w.config.series[0].data[dataPointIndex];
-                if (!dataPoint) return '';
-
-                const absWeek = dataPoint.x;
+                const absWeek = dataPointIndex + 1;
                 const termInfo = weekToTermMap[absWeek];
                 const d = globalWeeklyData[absWeek] || { study: 0, waste: 0, fun: 0 };
                 const achvs = globalAchvMap[absWeek] || [];
@@ -261,6 +246,7 @@ function renderChart(labelColors, sStudy, sWaste, sFun, periods, currentYear, yM
                         </div>
                 `;
 
+                // 🌟 显示阶段平均值
                 if (d.termAverage) {
                     html += `<div style="padding:0 5px 8px; font-size:0.85rem; color:#555; font-weight:bold; border-bottom: 1px solid #eee; margin-bottom:5px;">
                         📈 本阶段周均学习: <span style="color:#FEB019">${d.termAverage}h</span>
@@ -293,13 +279,10 @@ function renderChart(labelColors, sStudy, sWaste, sFun, periods, currentYear, yM
                 return html;
             }
         },
-        // 🌟 修复图例重叠：增加底部 Padding
         grid: {
             borderColor: '#f1f1f1',
             xaxis: { lines: { show: false } },
-            padding: {
-                bottom: 40 // 留出 40px 给图例
-            }
+            padding: { bottom: 40 }
         }
     };
 
@@ -308,7 +291,7 @@ function renderChart(labelColors, sStudy, sWaste, sFun, periods, currentYear, yM
     chart.render();
 }
 
-// 辅助函数
+// 辅助函数 (保持不变)
 function buildWeekToTermMap(periods, year) {
     weekToTermMap = {};
     const firstPeriodStart = parseDate(periods[0].start);
