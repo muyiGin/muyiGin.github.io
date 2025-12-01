@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <title>学期详情</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/apexcharts.js"></script>
+    <style>
+        /* 详情页特有样式 */
+        .back-btn {
+            padding: 5px 15px;
+            background: #333;
+            color: #fff;
+            text-decoration: none;
+            font-weight: bold;
+            margin-right: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="header-bar">
+        <a href="index.html" class="back-btn">← 返回首页</a>
+        <div class="box-title" id="term-title">加载中...</div>
+    </div>
+
+    <div id="wrapper" style="width: 90vw;">
+        <div id="chart-area"></div>
+        <div id="chart-brush"></div>
+    </div>
+
+    <script src="js/detail.js"></script>
+</body>
+
+</html>

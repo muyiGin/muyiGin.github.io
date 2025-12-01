@@ -1,0 +1,59 @@
+{
+    "currentYear": 2025,
+    "2025": [
+        {
+            "id": "spring_term",
+            "name": "春季学期",
+            "type": "term",
+            "folder": "SP",
+            "start": "2025-02-17",
+            "end": "2025-04-18",
+            "color": "#00E396"
+        },
+        {
+            "id": "spring_vacation",
+            "name": "春假",
+            "type": "vacation",
+            "folder": "SP_vac",
+            "start": "2025-04-19",
+            "end": "2025-05-11",
+            "color": "#008FFB"
+        },
+        {
+            "id": "summer_term",
+            "name": "夏季学期",
+            "type": "term",
+            "folder": "SU",
+            "start": "2025-05-12",
+            "end": "2025-08-10",
+            "color": "#FEB019"
+        },
+        {
+            "id": "summer_vacation",
+            "name": "暑假",
+            "type": "vacation",
+            "folder": "SU_vac",
+            "start": "2025-08-11",
+            "end": "2025-09-14",
+            "color": "#008FFB"
+        },
+        {
+            "id": "autumn_term",
+            "name": "秋季学期",
+            "type": "term",
+            "folder": "AU",
+            "start": "2025-09-15",
+            "end": "2025-12-21",
+            "color": "#FF4560"
+        },
+        {
+            "id": "winter_vacation",
+            "name": "寒假",
+            "type": "vacation",
+            "folder": "WT_vac",
+            "start": "2025-12-22",
+            "end": "2026-03-01",
+            "color": "#008FFB"
+        }
+    ]
+}

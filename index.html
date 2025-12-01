@@ -3,17 +3,47 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>学习时间统计</title>
+    <title>时间统计</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/apexcharts.js"></script>
 </head>
 
 <body>
-    <ul>
-        <li><a href="sophomore_spring.html">大二春季学期（2025/2/17-2025/4/18）</a>，该<a
-                href="https://www.cnblogs.com/muyiGin/p/18835948">学期总结</a>已完成~</li>
-        <li><a href="sophomore_summer.html">大二夏季学期（2025/5/12-2025/8/10）</a>，该<a
-                href="https://www.cnblogs.com/muyiGin/p/19030646">学期总结</a>已完成~</li>
-        <li><a href="junior_autumn.html">大三秋季学期（2025/9/15-2025/12/14）</a>，该<a href="">学期总结</a>已完成~</li>
-    </ul>
+
+    <div id="header-bar">
+        <div class="box-select">
+            <select id="year-select">
+                <option value="2025">2025年</option>
+            </select>
+        </div>
+        <div class="box-title">全部</div>
+        <div id="year-summary">数据加载中...</div>
+    </div>
+
+    <div id="modal-overlay" class="hidden">
+        <div id="modal-box">
+            <button id="close-modal">×</button>
+            <div class="modal-header">
+                <h2 id="modal-title">第 XX 周详情</h2>
+                <span id="modal-date-range">2025/xx/xx - 2025/xx/xx</span>
+            </div>
+            <div class="modal-content">
+                <div class="modal-column">
+                    <h3>🏆 本周成就</h3>
+                    <div id="modal-achv-list" class="scroll-area"></div>
+                </div>
+                <div class="modal-divider"></div>
+                <div class="modal-column">
+                    <h3>🎮 娱乐清单</h3>
+                    <div id="modal-fun-list" class="scroll-area"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="chart-container"></div>
+
+    <script src="js/index.js"></script>
 </body>
 
 </html>

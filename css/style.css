@@ -1,0 +1,274 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #fdfaf3;
+    color: #333;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* 顶部控制栏 */
+#header-bar {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    border-bottom: 2px solid #333;
+    padding: 15px 40px;
+    background: #fff;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 500;
+}
+
+.box-select select,
+.box-title {
+    font-size: 1.2rem;
+    padding: 5px 10px;
+    border: 2px solid #333;
+    font-weight: bold;
+    background: #fff;
+}
+
+#year-summary {
+    margin-left: auto;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+#chart-container {
+    width: 98vw;
+    height: 85vh;
+    margin: 20px auto;
+    position: relative;
+    overflow: hidden;
+    padding: 0 10px;
+    box-sizing: border-box;
+}
+
+.apexcharts-xaxis-label {
+    cursor: default;
+    user-select: none;
+    transition: opacity 0.2s ease;
+}
+
+.active-term-label {
+    fill: #333 !important;
+    font-size: 15px !important;
+    font-weight: 900 !important;
+    opacity: 1 !important;
+}
+
+/* 🌟 新增：自定义悬浮 Tooltip 样式 */
+.apexcharts-tooltip {
+    background: #fff !important;
+    border: 2px solid #333 !important;
+    box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.2) !important;
+    border-radius: 4px !important;
+}
+
+.custom-tooltip {
+    padding: 10px;
+    max-width: 320px;
+    /* 限制宽度，防止太宽 */
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.tooltip-header {
+    border-bottom: 2px dashed #eee;
+    padding-bottom: 5px;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #d35400;
+}
+
+.tooltip-stats {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+    background: #f9f9f9;
+    padding: 5px;
+    border-radius: 4px;
+}
+
+.tooltip-section {
+    margin-top: 8px;
+}
+
+.tooltip-section h4 {
+    margin: 0 0 4px 0;
+    font-size: 0.85rem;
+    color: #666;
+    text-transform: uppercase;
+    border-left: 3px solid #333;
+    padding-left: 5px;
+}
+
+.tooltip-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 150px;
+    /* 限制高度，内容太多可滚动 */
+    overflow-y: auto;
+}
+
+.tooltip-list li {
+    font-size: 0.85rem;
+    padding: 2px 0;
+    border-bottom: 1px solid #eee;
+    line-height: 1.4;
+}
+
+/* 滚动条美化 */
+.tooltip-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.tooltip-list::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 2px;
+}
+
+/* 标签样式 */
+.tag {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-right: 4px;
+    color: white;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.tag.anime {
+    background: #FF4560;
+}
+
+.tag.manga {
+    background: #00E396;
+}
+
+.tag.novel {
+    background: #008FFB;
+}
+
+.tag.game {
+    background: #775DD0;
+}
+
+/* 模态框样式 (保持不变) */
+.hidden {
+    display: none !important;
+}
+
+#modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#modal-box {
+    width: 70vw;
+    height: 60vh;
+    background: #fff;
+    border: 3px solid #333;
+    box-shadow: 10px 10px 0px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    padding: 20px;
+    border-radius: 4px;
+}
+
+#close-modal {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: #333;
+}
+
+.modal-header {
+    margin-bottom: 15px;
+    border-bottom: 2px dashed #ccc;
+    padding-bottom: 10px;
+}
+
+.modal-header h2 {
+    margin: 0;
+    color: #d35400;
+}
+
+#modal-date-range {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.modal-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.modal-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 0 10px;
+}
+
+.modal-column h3 {
+    margin-top: 0;
+    font-size: 1.1rem;
+    color: #444;
+    background: #eee;
+    padding: 5px 10px;
+    border-radius: 4px;
+}
+
+.modal-divider {
+    width: 2px;
+    background-color: #eee;
+    margin: 0 10px;
+}
+
+.scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.scroll-area::-webkit-scrollbar {
+    width: 6px;
+}
+
+.scroll-area::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.back-btn {
+    padding: 5px 15px;
+    background: #333;
+    color: #fff;
+    text-decoration: none;
+    font-weight: bold;
+    margin-right: 20px;
+}
