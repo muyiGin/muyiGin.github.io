@@ -96,7 +96,6 @@ async function loadYearData(year) {
     const maxWeek = 52;
     const labelColors = [];
     const seriesStudy = [], seriesWaste = [], seriesFun = [], seriesProject = [];
-    const avgAnnotations = []; // 🌟 红线标注数组
 
     // 平均值计算变量
     let currentTermId = null;
@@ -127,33 +126,11 @@ async function loadYearData(year) {
         }
         const d = weeklyData[i];
 
-        // 3. 计算本阶段学习平均值 & 生成红线
+        // 3. 计算本阶段学习平均值 (仅计算学习Study)
         if (d.study > 0 || d.waste > 0 || d.fun > 0 || d.project > 0) {
             termAccumulatedStudy += d.study;
             termWeeksCount++;
             d.termAverage = (termAccumulatedStudy / termWeeksCount).toFixed(1);
-
-            // 🌟 核心：添加红线标注
-            avgAnnotations.push({
-                x: i, // 直接对应数值X轴
-                y: parseFloat(d.termAverage),
-                borderColor: '#FF0000',
-                marker: { size: 0 },
-                label: {
-                    borderColor: '#FF0000',
-                    style: {
-                        color: '#fff',
-                        background: '#FF0000',
-                        padding: {
-                            left: 18, right: 18, // 宽度
-                            top: 1.5, bottom: 1.5 // 厚度
-                        },
-                        fontSize: '1px',
-                    },
-                    text: ' ',
-                    offsetY: 0
-                }
-            });
         }
 
         // 4. 推入数据
@@ -162,6 +139,7 @@ async function loadYearData(year) {
         seriesFun.push({ x: i, y: -Math.abs(d.fun) });
         seriesProject.push({ x: i, y: -Math.abs(d.project) });
 
+        // 计算 Y 轴下限
         const currentNegativeHeight = -Math.abs(d.fun) - Math.abs(d.project);
         if (currentNegativeHeight < minDataValue) minDataValue = currentNegativeHeight;
     }
@@ -171,10 +149,10 @@ async function loadYearData(year) {
     const tickAmount = (yMax - yMin) / 20;
 
     updateSummary(totalStudy, totalWaste, totalFun, totalProject);
-    renderChart(labelColors, seriesStudy, seriesWaste, seriesFun, seriesProject, avgAnnotations, periods, year, yMin, yMax, tickAmount);
+    renderChart(labelColors, seriesStudy, seriesWaste, seriesFun, seriesProject, periods, year, yMin, yMax, tickAmount);
 }
 
-function renderChart(labelColors, sStudy, sWaste, sFun, sProject, avgAnnotations, periods, currentYear, yMin, yMax, tickAmount) {
+function renderChart(labelColors, sStudy, sWaste, sFun, sProject, periods, currentYear, yMin, yMax, tickAmount) {
     const options = {
         series: [
             { name: '学习', data: sStudy },
@@ -186,22 +164,17 @@ function renderChart(labelColors, sStudy, sWaste, sFun, sProject, avgAnnotations
             type: 'bar',
             height: '100%',
             stacked: true,
-            // 🌟 禁用交互以恢复点击
+            // 🌟 禁用干扰项，确保点击生效
             toolbar: { show: false },
             zoom: { enabled: false },
             selection: { enabled: false },
             events: {
                 dataPointSelection: function (event, chartContext, config) {
-                    const dataPoint = config.w.config.series[0].data[config.dataPointIndex];
-                    if (dataPoint) {
-                        openModal(dataPoint.x, currentYear);
-                    }
+                    // 🌟 简单粗暴的计算：index 0 就是第 1 周
+                    const weekNum = config.dataPointIndex + 1;
+                    openModal(weekNum, currentYear);
                 }
             }
-        },
-        // 🌟 注入红线
-        annotations: {
-            points: avgAnnotations
         },
         colors: ['#FEB019', '#775DD0', '#00E396', '#FF4560'],
         plotOptions: {
@@ -252,10 +225,9 @@ function renderChart(labelColors, sStudy, sWaste, sFun, sProject, avgAnnotations
             shared: true,
             intersect: false,
             custom: function ({ series, seriesIndex, dataPointIndex, w }) {
-                const dataPoint = w.config.series[0].data[dataPointIndex];
-                if (!dataPoint) return '';
+                // 直接使用 index 对应的周数
+                const absWeek = dataPointIndex + 1;
 
-                const absWeek = dataPoint.x;
                 const termInfo = weekToTermMap[absWeek];
                 const d = globalWeeklyData[absWeek] || { study: 0, waste: 0, fun: 0, project: 0 };
                 const achvs = globalAchvMap[absWeek] || [];
@@ -288,10 +260,9 @@ function renderChart(labelColors, sStudy, sWaste, sFun, sProject, avgAnnotations
                         </div>
                 `;
 
-                // 🌟 Tooltip 显示平均值
                 if (d.termAverage) {
                     html += `<div style="padding:0 5px 8px; font-size:0.85rem; color:#555; font-weight:bold; border-bottom: 1px solid #eee; margin-bottom:5px; text-align:center;">
-                        📈 本阶段周均学习: <span style="color:#FF0000">${d.termAverage}h</span>
+                        📈 本阶段周均学习: <span style="color:#FEB019">${d.termAverage}h</span>
                     </div>`;
                 }
 
@@ -333,6 +304,7 @@ function renderChart(labelColors, sStudy, sWaste, sFun, sProject, avgAnnotations
     chart.render();
 }
 
+// 统计文字更新 (娱乐和项目分开)
 function updateSummary(study, waste, fun, project) {
     const total = study + waste + fun + project;
     if (total === 0) return;
