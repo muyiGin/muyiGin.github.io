@@ -51,7 +51,7 @@ async function loadYearData(year) {
     await loadGlobalFunData(year);
 
     let weeklyData = {};
-    let totalStudy = 0, totalWaste = 0, totalFun = 0;
+    let totalStudy = 0, totalWaste = 0, totalFun = 0, totalProject = 0;
 
     // 遍历学期加载数据
     for (let p of periods) {
@@ -71,16 +71,21 @@ async function loadYearData(year) {
                 const study = parseFloat(parts[1]) || 0;
                 const fun = parseFloat(parts[2]) || 0;
                 const waste = parseFloat(parts[3]) || 0;
+                const project = parseFloat(parts[4]) || 0;
 
                 const absWeek = termStartWeek + relWeek - 1;
 
-                if (!weeklyData[absWeek]) weeklyData[absWeek] = { study: 0, waste: 0, fun: 0 };
+                if (!weeklyData[absWeek]) weeklyData[absWeek] = { study: 0, waste: 0, fun: 0, project: 0 };
 
                 weeklyData[absWeek].study = study;
                 weeklyData[absWeek].waste = waste;
                 weeklyData[absWeek].fun = fun;
+                weeklyData[absWeek].project = project;
 
-                totalStudy += study; totalWaste += waste; totalFun += fun;
+                totalStudy += study;
+                totalWaste += waste;
+                totalFun += fun;
+                totalProject += project;
             });
         } catch (e) { }
     }
@@ -89,9 +94,9 @@ async function loadYearData(year) {
 
     // 准备图表数据
     const maxWeek = 52;
-    const categories = [];
     const labelColors = [];
-    const seriesStudy = [], seriesWaste = [], seriesFun = [];
+    const seriesStudy = [], seriesWaste = [], seriesFun = [], seriesProject = [];
+    const avgAnnotations = []; // 🌟 红线标注数组
 
     // 平均值计算变量
     let currentTermId = null;
@@ -102,78 +107,103 @@ async function loadYearData(year) {
     for (let i = 1; i <= maxWeek; i++) {
         const termInfo = weekToTermMap[i];
 
-        // 检测学期切换，重置平均值
-        let thisWeekTermId = termInfo ? termInfo.termId : 'unknown_term';
+        // 1. 检测学期切换
+        let thisWeekTermId = termInfo ? termInfo.termId : 'unknown';
         if (thisWeekTermId !== currentTermId) {
             currentTermId = thisWeekTermId;
             termAccumulatedStudy = 0;
             termWeeksCount = 0;
         }
 
+        // 2. 设置颜色
         if (termInfo) {
-            categories.push(`${termInfo.relativeWeek}`);
             labelColors.push(termInfo.color);
         } else {
-            categories.push(`${i}`);
             labelColors.push('#ccc');
-
-            if (currentTermId !== 'unknown') {
-                currentTermId = 'unknown';
-                termAccumulatedStudy = 0;
-                termWeeksCount = 0;
-            }
         }
 
         if (!weeklyData[i]) {
-            weeklyData[i] = { study: 0, waste: 0, fun: 0 };
+            weeklyData[i] = { study: 0, waste: 0, fun: 0, project: 0 };
         }
         const d = weeklyData[i];
 
-        // 计算本阶段平均值
-        if (d.study > 0 || d.waste > 0 || d.fun > 0) {
+        // 3. 计算本阶段学习平均值 & 生成红线
+        if (d.study > 0 || d.waste > 0 || d.fun > 0 || d.project > 0) {
             termAccumulatedStudy += d.study;
             termWeeksCount++;
             d.termAverage = (termAccumulatedStudy / termWeeksCount).toFixed(1);
+
+            // 🌟 核心：添加红线标注
+            avgAnnotations.push({
+                x: i, // 直接对应数值X轴
+                y: parseFloat(d.termAverage),
+                borderColor: '#FF0000',
+                marker: { size: 0 },
+                label: {
+                    borderColor: '#FF0000',
+                    style: {
+                        color: '#fff',
+                        background: '#FF0000',
+                        padding: {
+                            left: 18, right: 18, // 宽度
+                            top: 1.5, bottom: 1.5 // 厚度
+                        },
+                        fontSize: '1px',
+                    },
+                    text: ' ',
+                    offsetY: 0
+                }
+            });
         }
 
-        seriesStudy.push(d.study);
-        seriesWaste.push(d.waste);
-        seriesFun.push(-Math.abs(d.fun));
+        // 4. 推入数据
+        seriesStudy.push({ x: i, y: d.study });
+        seriesWaste.push({ x: i, y: d.waste });
+        seriesFun.push({ x: i, y: -Math.abs(d.fun) });
+        seriesProject.push({ x: i, y: -Math.abs(d.project) });
 
-        if (-Math.abs(d.fun) < minDataValue) minDataValue = -Math.abs(d.fun);
+        const currentNegativeHeight = -Math.abs(d.fun) - Math.abs(d.project);
+        if (currentNegativeHeight < minDataValue) minDataValue = currentNegativeHeight;
     }
 
     const yMax = 80;
     const yMin = Math.floor(minDataValue / 20) * 20;
     const tickAmount = (yMax - yMin) / 20;
 
-    updateSummary(totalStudy, totalWaste, totalFun);
-    renderChart(categories, labelColors, seriesStudy, seriesWaste, seriesFun, periods, year, yMin, yMax, tickAmount);
+    updateSummary(totalStudy, totalWaste, totalFun, totalProject);
+    renderChart(labelColors, seriesStudy, seriesWaste, seriesFun, seriesProject, avgAnnotations, periods, year, yMin, yMax, tickAmount);
 }
 
-function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, currentYear, yMin, yMax, tickAmount) {
+function renderChart(labelColors, sStudy, sWaste, sFun, sProject, avgAnnotations, periods, currentYear, yMin, yMax, tickAmount) {
     const options = {
         series: [
             { name: '学习', data: sStudy },
             { name: '浪费', data: sWaste },
-            { name: '娱乐', data: sFun }
+            { name: '娱乐', data: sFun },
+            { name: '项目', data: sProject }
         ],
         chart: {
             type: 'bar',
             height: '100%',
             stacked: true,
-            // 🌟 关键修复：彻底禁用工具栏和缩放，恢复点击事件
+            // 🌟 禁用交互以恢复点击
             toolbar: { show: false },
             zoom: { enabled: false },
             selection: { enabled: false },
             events: {
                 dataPointSelection: function (event, chartContext, config) {
-                    const weekIndex = config.dataPointIndex + 1;
-                    openModal(weekIndex, currentYear);
+                    const dataPoint = config.w.config.series[0].data[config.dataPointIndex];
+                    if (dataPoint) {
+                        openModal(dataPoint.x, currentYear);
+                    }
                 }
             }
         },
-        colors: ['#FEB019', '#775DD0', '#00E396'],
+        // 🌟 注入红线
+        annotations: {
+            points: avgAnnotations
+        },
+        colors: ['#FEB019', '#775DD0', '#00E396', '#FF4560'],
         plotOptions: {
             bar: {
                 columnWidth: '85%',
@@ -196,7 +226,10 @@ function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, cur
             labels: { formatter: (val) => Math.abs(val).toFixed(0) }
         },
         xaxis: {
-            categories: categories,
+            type: 'numeric',
+            min: 0.5,
+            max: 52.5,
+            tickAmount: 52,
             axisBorder: { show: true, color: '#333' },
             axisTicks: { show: true, height: 6, color: '#333' },
             labels: {
@@ -206,7 +239,12 @@ function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, cur
                     fontWeight: 700,
                     fontFamily: 'Segoe UI, sans-serif'
                 },
-                offsetY: 0
+                offsetY: 0,
+                formatter: function (val) {
+                    const absWeek = Math.round(val);
+                    const termInfo = weekToTermMap[absWeek];
+                    return termInfo ? termInfo.relativeWeek : '';
+                }
             },
             tooltip: { enabled: false }
         },
@@ -214,9 +252,12 @@ function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, cur
             shared: true,
             intersect: false,
             custom: function ({ series, seriesIndex, dataPointIndex, w }) {
-                const absWeek = dataPointIndex + 1;
+                const dataPoint = w.config.series[0].data[dataPointIndex];
+                if (!dataPoint) return '';
+
+                const absWeek = dataPoint.x;
                 const termInfo = weekToTermMap[absWeek];
-                const d = globalWeeklyData[absWeek] || { study: 0, waste: 0, fun: 0 };
+                const d = globalWeeklyData[absWeek] || { study: 0, waste: 0, fun: 0, project: 0 };
                 const achvs = globalAchvMap[absWeek] || [];
                 const funs = globalFunMap[absWeek] || [];
 
@@ -243,13 +284,14 @@ function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, cur
                             <span style="color:#FEB019">📚 学习: ${d.study}h</span>
                             <span style="color:#775DD0">🚽 浪费: ${d.waste}h</span>
                             <span style="color:#00E396">🎮 娱乐: ${d.fun}h</span>
+                            <span style="color:#FF4560">💻 项目: ${d.project}h</span>
                         </div>
                 `;
 
-                // 🌟 显示阶段平均值
+                // 🌟 Tooltip 显示平均值
                 if (d.termAverage) {
-                    html += `<div style="padding:0 5px 8px; font-size:0.85rem; color:#555; font-weight:bold; border-bottom: 1px solid #eee; margin-bottom:5px;">
-                        📈 本阶段周均学习: <span style="color:#FEB019">${d.termAverage}h</span>
+                    html += `<div style="padding:0 5px 8px; font-size:0.85rem; color:#555; font-weight:bold; border-bottom: 1px solid #eee; margin-bottom:5px; text-align:center;">
+                        📈 本阶段周均学习: <span style="color:#FF0000">${d.termAverage}h</span>
                     </div>`;
                 }
 
@@ -291,7 +333,18 @@ function renderChart(categories, labelColors, sStudy, sWaste, sFun, periods, cur
     chart.render();
 }
 
-// 辅助函数 (保持不变)
+function updateSummary(study, waste, fun, project) {
+    const total = study + waste + fun + project;
+    if (total === 0) return;
+    const studyPct = ((study / total) * 100).toFixed(1);
+    const funPct = ((fun / total) * 100).toFixed(1);
+    const projectPct = ((project / total) * 100).toFixed(1);
+
+    document.getElementById('year-summary').innerHTML =
+        `共记录 <b>${total.toFixed(0)}</b> 小时，其中学习占 <b>${studyPct}%</b>，娱乐占 <b>${funPct}%</b>，项目占 <b>${projectPct}%</b>`;
+}
+
+// 辅助函数保持不变
 function buildWeekToTermMap(periods, year) {
     weekToTermMap = {};
     const firstPeriodStart = parseDate(periods[0].start);
@@ -383,15 +436,6 @@ async function loadAchvData(year, folder) {
             });
         }
     } catch (e) { }
-}
-
-function updateSummary(study, waste, fun) {
-    const total = study + waste + fun;
-    if (total === 0) return;
-    const studyPct = ((study / total) * 100).toFixed(1);
-    const funPct = ((fun / total) * 100).toFixed(1);
-    document.getElementById('year-summary').innerHTML =
-        `共记录 <b>${total.toFixed(0)}</b> 小时，其中学习占 <b>${studyPct}%</b>，娱乐占 <b>${funPct}%</b>`;
 }
 
 function openModal(weekNum, year) {

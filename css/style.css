@@ -8,7 +8,6 @@ body {
     overflow-x: hidden;
 }
 
-/* 顶部控制栏 */
 #header-bar {
     display: flex;
     gap: 20px;
@@ -62,18 +61,19 @@ body {
     opacity: 1 !important;
 }
 
-/* 🌟 新增：自定义悬浮 Tooltip 样式 */
+/* 🌟 关键：确保 Tooltip 不会拦截点击事件 */
 .apexcharts-tooltip {
     background: #fff !important;
     border: 2px solid #333 !important;
     box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.2) !important;
     border-radius: 4px !important;
+    pointer-events: none !important;
+    /* 👈 让点击穿透 */
 }
 
 .custom-tooltip {
     padding: 10px;
     max-width: 320px;
-    /* 限制宽度，防止太宽 */
     font-family: 'Segoe UI', sans-serif;
 }
 
@@ -86,12 +86,13 @@ body {
 }
 
 .tooltip-stats {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
     margin-bottom: 10px;
     font-size: 0.9rem;
     background: #f9f9f9;
-    padding: 5px;
+    padding: 8px;
     border-radius: 4px;
 }
 
@@ -113,7 +114,6 @@ body {
     padding: 0;
     margin: 0;
     max-height: 150px;
-    /* 限制高度，内容太多可滚动 */
     overflow-y: auto;
 }
 
@@ -124,7 +124,6 @@ body {
     line-height: 1.4;
 }
 
-/* 滚动条美化 */
 .tooltip-list::-webkit-scrollbar {
     width: 4px;
 }
@@ -134,7 +133,6 @@ body {
     border-radius: 2px;
 }
 
-/* 标签样式 */
 .tag {
     display: inline-block;
     padding: 2px 6px;
@@ -162,7 +160,10 @@ body {
     background: #775DD0;
 }
 
-/* 模态框样式 (保持不变) */
+.tag.project {
+    background: #FF4560;
+}
+
 .hidden {
     display: none !important;
 }
