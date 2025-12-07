@@ -12,10 +12,19 @@ let weekToTermMap = {};
 async function init() {
     const closeBtn = document.getElementById('close-modal');
     const overlay = document.getElementById('modal-overlay');
+    const termSelect = document.getElementById('term-select'); // 获取筛选下拉框
+
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
     if (overlay) overlay.addEventListener('click', (e) => {
         if (e.target.id === 'modal-overlay') closeModal();
     });
+
+    // 监听筛选变化
+    if (termSelect) {
+        termSelect.addEventListener('change', function () {
+            updateSummaryByTerm(this.value);
+        });
+    }
 
     // 悬浮联动
     document.addEventListener('mouseover', function (e) {
@@ -46,12 +55,14 @@ async function loadYearData(year) {
     const periods = globalConfig[year];
     if (!periods) return;
 
+    // 1. 填充下拉菜单
+    populateTermSelect(periods);
+
     globalFunMap = {};
     buildWeekToTermMap(periods, year);
     await loadGlobalFunData(year);
 
     let weeklyData = {};
-    let totalStudy = 0, totalWaste = 0, totalFun = 0, totalProject = 0;
 
     // 遍历学期加载数据
     for (let p of periods) {
@@ -81,11 +92,6 @@ async function loadYearData(year) {
                 weeklyData[absWeek].waste = waste;
                 weeklyData[absWeek].fun = fun;
                 weeklyData[absWeek].project = project;
-
-                totalStudy += study;
-                totalWaste += waste;
-                totalFun += fun;
-                totalProject += project;
             });
         } catch (e) { }
     }
@@ -126,7 +132,7 @@ async function loadYearData(year) {
         }
         const d = weeklyData[i];
 
-        // 3. 计算本阶段学习平均值 (仅计算学习Study)
+        // 3. 计算本阶段学习平均值
         if (d.study > 0 || d.waste > 0 || d.fun > 0 || d.project > 0) {
             termAccumulatedStudy += d.study;
             termWeeksCount++;
@@ -139,7 +145,7 @@ async function loadYearData(year) {
         seriesFun.push({ x: i, y: -Math.abs(d.fun) });
         seriesProject.push({ x: i, y: -Math.abs(d.project) });
 
-        // 计算 Y 轴下限
+        // 计算Y轴下限
         const currentNegativeHeight = -Math.abs(d.fun) - Math.abs(d.project);
         if (currentNegativeHeight < minDataValue) minDataValue = currentNegativeHeight;
     }
@@ -148,8 +154,49 @@ async function loadYearData(year) {
     const yMin = Math.floor(minDataValue / 20) * 20;
     const tickAmount = (yMax - yMin) / 20;
 
-    updateSummary(totalStudy, totalWaste, totalFun, totalProject);
+    // 初始化统计（显示全部）
+    updateSummaryByTerm('all');
+
     renderChart(labelColors, seriesStudy, seriesWaste, seriesFun, seriesProject, periods, year, yMin, yMax, tickAmount);
+}
+
+// 填充下拉菜单
+function populateTermSelect(periods) {
+    const select = document.getElementById('term-select');
+    if (!select) return;
+    select.innerHTML = '<option value="all">全部</option>';
+    periods.forEach(p => {
+        const option = document.createElement('option');
+        option.value = p.id;
+        option.textContent = p.name;
+        select.appendChild(option);
+    });
+}
+
+// 根据筛选更新统计
+function updateSummaryByTerm(termId) {
+    let tStudy = 0, tWaste = 0, tFun = 0, tProject = 0;
+
+    for (let i = 1; i <= 52; i++) {
+        const termInfo = weekToTermMap[i];
+        const d = globalWeeklyData[i];
+        if (!d) continue;
+
+        let isMatch = false;
+        if (termId === 'all') {
+            isMatch = true;
+        } else if (termInfo && termInfo.termId === termId) {
+            isMatch = true;
+        }
+
+        if (isMatch) {
+            tStudy += d.study;
+            tWaste += d.waste;
+            tFun += d.fun;
+            tProject += d.project;
+        }
+    }
+    updateSummary(tStudy, tWaste, tFun, tProject);
 }
 
 function renderChart(labelColors, sStudy, sWaste, sFun, sProject, periods, currentYear, yMin, yMax, tickAmount) {
@@ -164,13 +211,13 @@ function renderChart(labelColors, sStudy, sWaste, sFun, sProject, periods, curre
             type: 'bar',
             height: '100%',
             stacked: true,
-            // 🌟 禁用干扰项，确保点击生效
             toolbar: { show: false },
             zoom: { enabled: false },
             selection: { enabled: false },
             events: {
                 dataPointSelection: function (event, chartContext, config) {
-                    // 🌟 简单粗暴的计算：index 0 就是第 1 周
+                    // 🌟 修复核心：直接使用 index + 1 作为周数
+                    // 这里的 index 是 0-based，而我们的周数是 1-based (1~52)
                     const weekNum = config.dataPointIndex + 1;
                     openModal(weekNum, currentYear);
                 }
@@ -304,10 +351,12 @@ function renderChart(labelColors, sStudy, sWaste, sFun, sProject, periods, curre
     chart.render();
 }
 
-// 统计文字更新 (娱乐和项目分开)
 function updateSummary(study, waste, fun, project) {
     const total = study + waste + fun + project;
-    if (total === 0) return;
+    if (total === 0) {
+        document.getElementById('year-summary').innerHTML = "无记录";
+        return;
+    }
     const studyPct = ((study / total) * 100).toFixed(1);
     const funPct = ((fun / total) * 100).toFixed(1);
     const projectPct = ((project / total) * 100).toFixed(1);
