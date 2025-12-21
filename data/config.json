@@ -55,5 +55,34 @@
             "end": "2026-03-01",
             "color": "#008FFB"
         }
+    ],
+    "2026": [
+        {
+            "id": "spring_term",
+            "name": "春季学期",
+            "type": "term",
+            "folder": "SP",
+            "start": "2025-03-02",
+            "end": "2025-05-03",
+            "color": "#00E396"
+        },
+        {
+            "id": "spring_vacation",
+            "name": "春假",
+            "type": "vacation",
+            "folder": "SP_vac",
+            "start": "2025-05-04",
+            "end": "2025-05-10",
+            "color": "#008FFB"
+        },
+        {
+            "id": "summer_term",
+            "name": "夏季学期",
+            "type": "term",
+            "folder": "SU",
+            "start": "2025-05-11",
+            "end": "2025-08-09",
+            "color": "#FEB019"
+        }
     ]
 }
