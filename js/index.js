@@ -12,21 +12,28 @@ let weekToTermMap = {};
 async function init() {
     const closeBtn = document.getElementById('close-modal');
     const overlay = document.getElementById('modal-overlay');
-    const termSelect = document.getElementById('term-select'); // 获取筛选下拉框
+    const termSelect = document.getElementById('term-select');
+    const yearSelect = document.getElementById('year-select');
 
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
     if (overlay) overlay.addEventListener('click', (e) => {
         if (e.target.id === 'modal-overlay') closeModal();
     });
 
-    // 监听筛选变化
+    if (yearSelect) {
+        yearSelect.addEventListener('change', function () {
+            const selectedYear = parseInt(this.value);
+            loadYearData(selectedYear);
+        });
+    }
+
     if (termSelect) {
         termSelect.addEventListener('change', function () {
             updateSummaryByTerm(this.value);
         });
     }
 
-    // 悬浮联动
+    // 悬浮联动 (适配类别轴)
     document.addEventListener('mouseover', function (e) {
         const target = e.target.closest('.apexcharts-xaxis-label');
         if (target) {
@@ -44,6 +51,10 @@ async function init() {
     try {
         const res = await fetch('data/config.json');
         globalConfig = await res.json();
+
+        if (yearSelect) {
+            yearSelect.value = globalConfig.currentYear;
+        }
         loadYearData(globalConfig.currentYear);
     } catch (e) {
         console.error("无法加载配置文件", e);
@@ -53,18 +64,58 @@ async function init() {
 
 async function loadYearData(year) {
     const periods = globalConfig[year];
-    if (!periods) return;
+    if (!periods) {
+        console.warn(`未找到 ${year} 年配置`);
+        return;
+    }
 
-    // 1. 填充下拉菜单
     populateTermSelect(periods);
 
+    // 1. 清空所有缓存
     globalFunMap = {};
+    globalAchvMap = {};
+    globalWeeklyData = {};
+
     buildWeekToTermMap(periods, year);
     await loadGlobalFunData(year);
 
     let weeklyData = {};
 
-    // 遍历学期加载数据
+    // --- 加载年初跨年寒假数据 ---
+    const firstPeriodStart = parseDate(periods[0].start);
+    const startWeek = getWeekNumber(firstPeriodStart);
+
+    if (startWeek > 1 && year !== 2025) {
+        try {
+            await loadAchvData(year, 'WT_vac');
+            const res = await fetch(`data/${year}/WT_vac/daily.csv`);
+            if (res.ok) {
+                const text = await res.text();
+                const termStartWeek = 1;
+
+                text.trim().split('\n').forEach(line => {
+                    const parts = line.trim().split(/\s+/);
+                    if (parts.length < 4) return;
+
+                    const relWeek = parseInt(parts[0]);
+                    const study = parseFloat(parts[1]) || 0;
+                    const fun = parseFloat(parts[2]) || 0;
+                    const waste = parseFloat(parts[3]) || 0;
+                    const project = parseFloat(parts[4]) || 0;
+
+                    const absWeek = termStartWeek + relWeek - 1;
+                    if (!weeklyData[absWeek]) weeklyData[absWeek] = { study: 0, waste: 0, fun: 0, project: 0 };
+
+                    weeklyData[absWeek].study = study;
+                    weeklyData[absWeek].waste = waste;
+                    weeklyData[absWeek].fun = fun;
+                    weeklyData[absWeek].project = project;
+                });
+            }
+        } catch (e) { }
+    }
+
+    // 遍历正常学期
     for (let p of periods) {
         try {
             await loadAchvData(year, p.folder);
@@ -100,19 +151,22 @@ async function loadYearData(year) {
 
     // 准备图表数据
     const maxWeek = 52;
+    // 🌟 改动：使用类别数组 categoryLabels
+    const categoryLabels = [];
     const labelColors = [];
+    // 🌟 改动：使用纯数字数组
     const seriesStudy = [], seriesWaste = [], seriesFun = [], seriesProject = [];
 
-    // 平均值计算变量
     let currentTermId = null;
     let termAccumulatedStudy = 0;
     let termWeeksCount = 0;
+
+    let maxDataValue = 0;
     let minDataValue = 0;
 
     for (let i = 1; i <= maxWeek; i++) {
         const termInfo = weekToTermMap[i];
 
-        // 1. 检测学期切换
         let thisWeekTermId = termInfo ? termInfo.termId : 'unknown';
         if (thisWeekTermId !== currentTermId) {
             currentTermId = thisWeekTermId;
@@ -120,10 +174,12 @@ async function loadYearData(year) {
             termWeeksCount = 0;
         }
 
-        // 2. 设置颜色
+        // 🌟 1. 生成标签和颜色
         if (termInfo) {
+            categoryLabels.push(termInfo.relativeWeek.toString()); // 明确存入 "1", "2"
             labelColors.push(termInfo.color);
         } else {
+            categoryLabels.push(''); // 空白周显示空字符串
             labelColors.push('#ccc');
         }
 
@@ -132,35 +188,42 @@ async function loadYearData(year) {
         }
         const d = weeklyData[i];
 
-        // 3. 计算本阶段学习平均值
         if (d.study > 0 || d.waste > 0 || d.fun > 0 || d.project > 0) {
             termAccumulatedStudy += d.study;
             termWeeksCount++;
             d.termAverage = (termAccumulatedStudy / termWeeksCount).toFixed(1);
         }
 
-        // 4. 推入数据
-        seriesStudy.push({ x: i, y: d.study });
-        seriesWaste.push({ x: i, y: d.waste });
-        seriesFun.push({ x: i, y: -Math.abs(d.fun) });
-        seriesProject.push({ x: i, y: -Math.abs(d.project) });
+        // 🌟 2. 推入纯数据
+        seriesStudy.push(d.study);
+        seriesWaste.push(d.waste);
+        seriesFun.push(-Math.abs(d.fun));
+        seriesProject.push(-Math.abs(d.project));
 
-        // 计算Y轴下限
-        const currentNegativeHeight = -Math.abs(d.fun) - Math.abs(d.project);
-        if (currentNegativeHeight < minDataValue) minDataValue = currentNegativeHeight;
+        const currentHeight = d.study + d.waste;
+        const currentDepth = -Math.abs(d.fun) - Math.abs(d.project);
+
+        if (currentHeight > maxDataValue) maxDataValue = currentHeight;
+        if (currentDepth < minDataValue) minDataValue = currentDepth;
     }
 
-    const yMax = 80;
-    const yMin = Math.floor(minDataValue / 20) * 20;
+    // 强制对称逻辑
+    let boundary = 80;
+    const absMax = Math.max(maxDataValue, Math.abs(minDataValue));
+
+    if (absMax > 80) {
+        boundary = Math.ceil(absMax / 20) * 20;
+    }
+
+    const yMax = boundary;
+    const yMin = -boundary;
     const tickAmount = (yMax - yMin) / 20;
 
-    // 初始化统计（显示全部）
     updateSummaryByTerm('all');
 
-    renderChart(labelColors, seriesStudy, seriesWaste, seriesFun, seriesProject, periods, year, yMin, yMax, tickAmount);
+    renderChart(categoryLabels, labelColors, seriesStudy, seriesWaste, seriesFun, seriesProject, periods, year, yMin, yMax, tickAmount);
 }
 
-// 填充下拉菜单
 function populateTermSelect(periods) {
     const select = document.getElementById('term-select');
     if (!select) return;
@@ -173,7 +236,6 @@ function populateTermSelect(periods) {
     });
 }
 
-// 根据筛选更新统计
 function updateSummaryByTerm(termId) {
     let tStudy = 0, tWaste = 0, tFun = 0, tProject = 0;
 
@@ -199,7 +261,7 @@ function updateSummaryByTerm(termId) {
     updateSummary(tStudy, tWaste, tFun, tProject);
 }
 
-function renderChart(labelColors, sStudy, sWaste, sFun, sProject, periods, currentYear, yMin, yMax, tickAmount) {
+function renderChart(categoryLabels, labelColors, sStudy, sWaste, sFun, sProject, periods, currentYear, yMin, yMax, tickAmount) {
     const options = {
         series: [
             { name: '学习', data: sStudy },
@@ -216,12 +278,22 @@ function renderChart(labelColors, sStudy, sWaste, sFun, sProject, periods, curre
             selection: { enabled: false },
             events: {
                 dataPointSelection: function (event, chartContext, config) {
-                    // 🌟 修复核心：直接使用 index + 1 作为周数
-                    // 这里的 index 是 0-based，而我们的周数是 1-based (1~52)
+                    // 🌟 类别轴：Index 0 直接对应 第1周
                     const weekNum = config.dataPointIndex + 1;
                     openModal(weekNum, currentYear);
                 }
             }
+        },
+        annotations: {
+            yaxis: [
+                {
+                    y: 0,
+                    borderColor: '#333',
+                    borderWidth: 1,
+                    strokeDashArray: 0,
+                    opacity: 0.5
+                }
+            ]
         },
         colors: ['#FEB019', '#775DD0', '#00E396', '#FF4560'],
         plotOptions: {
@@ -246,9 +318,9 @@ function renderChart(labelColors, sStudy, sWaste, sFun, sProject, periods, curre
             labels: { formatter: (val) => Math.abs(val).toFixed(0) }
         },
         xaxis: {
-            type: 'numeric',
-            min: 0.5,
-            max: 52.5,
+            // 🌟 核心修改：使用类别轴 (Category Axis)
+            type: 'category',
+            categories: categoryLabels, // 🌟 传入我们生成的 1, 2, 3... 数组
             tickAmount: 52,
             axisBorder: { show: true, color: '#333' },
             axisTicks: { show: true, height: 6, color: '#333' },
@@ -260,11 +332,7 @@ function renderChart(labelColors, sStudy, sWaste, sFun, sProject, periods, curre
                     fontFamily: 'Segoe UI, sans-serif'
                 },
                 offsetY: 0,
-                formatter: function (val) {
-                    const absWeek = Math.round(val);
-                    const termInfo = weekToTermMap[absWeek];
-                    return termInfo ? termInfo.relativeWeek : '';
-                }
+                // 类别轴不需要 formatter 查找，直接显示数组里的字符串
             },
             tooltip: { enabled: false }
         },
@@ -272,7 +340,7 @@ function renderChart(labelColors, sStudy, sWaste, sFun, sProject, periods, curre
             shared: true,
             intersect: false,
             custom: function ({ series, seriesIndex, dataPointIndex, w }) {
-                // 直接使用 index 对应的周数
+                // index + 1 即为绝对周数
                 const absWeek = dataPointIndex + 1;
 
                 const termInfo = weekToTermMap[absWeek];
@@ -365,7 +433,6 @@ function updateSummary(study, waste, fun, project) {
         `共记录 <b>${total.toFixed(0)}</b> 小时，其中学习占 <b>${studyPct}%</b>，娱乐占 <b>${funPct}%</b>，项目占 <b>${projectPct}%</b>`;
 }
 
-// 辅助函数保持不变
 function buildWeekToTermMap(periods, year) {
     weekToTermMap = {};
     const firstPeriodStart = parseDate(periods[0].start);
