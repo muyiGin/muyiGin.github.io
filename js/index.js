@@ -33,7 +33,6 @@ async function init() {
         });
     }
 
-    // 悬浮联动 (适配类别轴)
     document.addEventListener('mouseover', function (e) {
         const target = e.target.closest('.apexcharts-xaxis-label');
         if (target) {
@@ -85,7 +84,10 @@ async function loadYearData(year) {
     const firstPeriodStart = parseDate(periods[0].start);
     const startWeek = getWeekNumber(firstPeriodStart);
 
-    if (startWeek > 1 && year !== 2025) {
+    // 🌟 防重复检查：只有当配置里没有 WT_vac 时，才自动补充加载
+    const hasWinterVacInConfig = periods.some(p => p.folder === 'WT_vac');
+
+    if (startWeek > 1 && year !== 2025 && !hasWinterVacInConfig) {
         try {
             await loadAchvData(year, 'WT_vac');
             const res = await fetch(`data/${year}/WT_vac/daily.csv`);
@@ -151,10 +153,8 @@ async function loadYearData(year) {
 
     // 准备图表数据
     const maxWeek = 52;
-    // 🌟 改动：使用类别数组 categoryLabels
     const categoryLabels = [];
     const labelColors = [];
-    // 🌟 改动：使用纯数字数组
     const seriesStudy = [], seriesWaste = [], seriesFun = [], seriesProject = [];
 
     let currentTermId = null;
@@ -174,12 +174,12 @@ async function loadYearData(year) {
             termWeeksCount = 0;
         }
 
-        // 🌟 1. 生成标签和颜色
+        // 标签生成
         if (termInfo) {
-            categoryLabels.push(termInfo.relativeWeek.toString()); // 明确存入 "1", "2"
+            categoryLabels.push(termInfo.relativeWeek.toString());
             labelColors.push(termInfo.color);
         } else {
-            categoryLabels.push(''); // 空白周显示空字符串
+            categoryLabels.push('');
             labelColors.push('#ccc');
         }
 
@@ -194,7 +194,6 @@ async function loadYearData(year) {
             d.termAverage = (termAccumulatedStudy / termWeeksCount).toFixed(1);
         }
 
-        // 🌟 2. 推入纯数据
         seriesStudy.push(d.study);
         seriesWaste.push(d.waste);
         seriesFun.push(-Math.abs(d.fun));
@@ -278,7 +277,6 @@ function renderChart(categoryLabels, labelColors, sStudy, sWaste, sFun, sProject
             selection: { enabled: false },
             events: {
                 dataPointSelection: function (event, chartContext, config) {
-                    // 🌟 类别轴：Index 0 直接对应 第1周
                     const weekNum = config.dataPointIndex + 1;
                     openModal(weekNum, currentYear);
                 }
@@ -318,9 +316,8 @@ function renderChart(categoryLabels, labelColors, sStudy, sWaste, sFun, sProject
             labels: { formatter: (val) => Math.abs(val).toFixed(0) }
         },
         xaxis: {
-            // 🌟 核心修改：使用类别轴 (Category Axis)
-            type: 'category',
-            categories: categoryLabels, // 🌟 传入我们生成的 1, 2, 3... 数组
+            type: 'category', // 使用类别轴，防止标签循环错位
+            categories: categoryLabels,
             tickAmount: 52,
             axisBorder: { show: true, color: '#333' },
             axisTicks: { show: true, height: 6, color: '#333' },
@@ -331,8 +328,7 @@ function renderChart(categoryLabels, labelColors, sStudy, sWaste, sFun, sProject
                     fontWeight: 700,
                     fontFamily: 'Segoe UI, sans-serif'
                 },
-                offsetY: 0,
-                // 类别轴不需要 formatter 查找，直接显示数组里的字符串
+                offsetY: 0
             },
             tooltip: { enabled: false }
         },
@@ -340,7 +336,6 @@ function renderChart(categoryLabels, labelColors, sStudy, sWaste, sFun, sProject
             shared: true,
             intersect: false,
             custom: function ({ series, seriesIndex, dataPointIndex, w }) {
-                // index + 1 即为绝对周数
                 const absWeek = dataPointIndex + 1;
 
                 const termInfo = weekToTermMap[absWeek];
@@ -386,7 +381,7 @@ function renderChart(categoryLabels, labelColors, sStudy, sWaste, sFun, sProject
                         <div class="tooltip-section">
                             <h4>🏆 本周成就</h4>
                             <ul class="tooltip-list">
-                                ${achvs.join('')}
+                                ${[...new Set(achvs)].join('') /* 🌟 核心：显示前去重 */}
                             </ul>
                         </div>
                     `;
@@ -397,7 +392,7 @@ function renderChart(categoryLabels, labelColors, sStudy, sWaste, sFun, sProject
                         <div class="tooltip-section">
                             <h4>🎮 娱乐记录</h4>
                             <ul class="tooltip-list">
-                                ${funs.join('')}
+                                ${[...new Set(funs)].join('') /* 🌟 核心：显示前去重 */}
                             </ul>
                         </div>
                     `;
@@ -550,11 +545,16 @@ function openModal(weekNum, year) {
     const endStr = `${dEnd.getMonth() + 1}/${dEnd.getDate()}`;
     dateRange.innerText = `${startStr} ~ ${endStr}`;
 
+    // 🌟 核心：使用 Set 去除重复数据
     const achvData = globalAchvMap[weekNum];
-    achvList.innerHTML = (achvData && achvData.length > 0) ? `<ul>${achvData.join('')}</ul>` : `<div style="text-align:center; color:#999; margin-top:20px">本周没有记录成就</div>`;
+    const uniqueAchv = achvData ? [...new Set(achvData)] : [];
+
+    achvList.innerHTML = (uniqueAchv.length > 0) ? `<ul>${uniqueAchv.join('')}</ul>` : `<div style="text-align:center; color:#999; margin-top:20px">本周没有记录成就</div>`;
 
     const funData = globalFunMap[weekNum];
-    funList.innerHTML = (funData && funData.length > 0) ? `<ul>${funData.join('')}</ul>` : `<div style="text-align:center; color:#999; margin-top:20px">本周没有娱乐记录</div>`;
+    const uniqueFun = funData ? [...new Set(funData)] : [];
+
+    funList.innerHTML = (uniqueFun.length > 0) ? `<ul>${uniqueFun.join('')}</ul>` : `<div style="text-align:center; color:#999; margin-top:20px">本周没有娱乐记录</div>`;
 
     modal.classList.remove('hidden');
 }
