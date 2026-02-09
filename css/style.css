@@ -160,6 +160,10 @@ body {
     background: #775DD0;
 }
 
+.tag.movie {
+    background: #3be1ed;
+}
+
 .tag.project {
     background: #FF4560;
 }
